@@ -1,0 +1,41 @@
+﻿#pragma kernel CSMain
+
+uniform float G;
+uniform float4 stars[4];
+uniform float h;
+uniform uint itr;
+
+struct kitten {
+	float3 pos;
+	float3 vel;
+};
+
+RWStructuredBuffer<kitten> data;
+
+inline kitten D(float3 pos, float3 vel) {
+	kitten o;
+	o.pos = vel;
+	o.vel = float3(0, 0, 0);
+	[unroll] for (int i = 0; i < 4; ++i) {
+		float3 dpos = stars[i].xyz - pos;
+		float dist = length(dpos);
+		o.vel += G * stars[i].w / (dist * dist * dist) * dpos;
+	}
+	o.pos *= h;
+	o.vel *= h;
+	return o;
+}
+
+[numthreads(1024, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID) {
+	kitten cur = data[id.x];
+	for (uint i = 0; i < itr; i++) {
+		kitten k1 = D(cur.pos, cur.vel);
+		kitten k2 = D(cur.pos + k1.pos / 2, cur.vel + k1.vel / 2);
+		kitten k3 = D(cur.pos + k2.pos / 2, cur.vel + k2.vel / 2);
+		kitten k4 = D(cur.pos + k3.pos, cur.vel + k3.vel);
+		cur.pos += (k1.pos + 2 * k2.pos + 2 * k3.pos + k4.pos) / 6;
+		cur.vel += (k1.vel + 2 * k2.vel + 2 * k3.vel + k4.vel) / 6;
+	}
+	data[id.x] = cur;
+}
